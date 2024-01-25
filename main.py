@@ -13,11 +13,13 @@ from PyQt6.QtGui import QAction, QFont
 from PyQt6.QtWidgets import (QApplication, QFileDialog, QMainWindow, QPushButton,
                              QTextEdit, QVBoxLayout, QWidget, QProgressBar, QMessageBox)
 
-from downloading_app import big_model, small_model
+import settings
 
 
 g4f.debug.logging = True  # enable logging
 g4f.debug.version_check = False  # Disable automatic version checking
+
+ffmpeg_zip_url_win = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
 
 
 class MainWindow(QMainWindow):
@@ -182,7 +184,7 @@ class MainWindow(QMainWindow):
 
 
 if __name__ == '__main__':
-    model = big_model
+    model = settings.model
     app = QApplication(sys.argv)
 
     window = MainWindow()
