@@ -1,14 +1,14 @@
 import urllib.request
-from urllib.parse import urlparse, ParseResult
-
-from PyQt6.QtWidgets import *
 import sys
 import ssl
 import os
 import re
+from urllib.parse import urlparse
+from PyQt6.QtWidgets import QWidget, QApplication, QLabel, QProgressBar, QPushButton
 from dataclasses import dataclass
 
 ssl._create_default_https_context = ssl._create_unverified_context
+
 
 @dataclass
 class Model:
@@ -22,7 +22,6 @@ class Model:
     @property
     def parsed_url(self):
         return urlparse(self.__url)
-
 
     @property
     def url(self):
@@ -90,7 +89,7 @@ class DownloadingModelApp(QWidget):
 
     # when push button is pressed, this method is called
     def handle_progress(self, blocknum, blocksize, totalsize):
-        ## calculate the progress
+        # calculate the progress
         readed_data = blocknum * blocksize
 
         if totalsize > 0:
@@ -100,9 +99,6 @@ class DownloadingModelApp(QWidget):
 
     # method to download any file using urllib
     def download(self):
-        # specify the url of the file which is to be downloaded
-        # down_url = 'https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip'  # specify download url here
-        # parsed_url = urlparse(down_url)
         parsed_url = self.model.parsed_url
         file_name = os.path.basename(parsed_url.path)
         # specify save location where the file is to be saved
@@ -121,25 +117,16 @@ class DownloadingModelApp(QWidget):
         self.button.show()
 
 
-
-
-# main method to call our app
 if __name__ == '__main__':
-    # create app
-    # App = QApplication(sys.argv)
-    #
-    # # create the instance of our window
-    # window = DownloadingModelApp(big_model)
     # Получаем список аргументов командной строки
     print('downloading')
     args = sys.argv
     # Получаем параметр
-    param = args[1]
+    param = args[1]   # small_model
     # Создаем приложение
     App = QApplication(sys.argv[1:])
     # Создаем окно приложения с переданным параметром
     window = DownloadingModelApp(param)
     window.download()
 
-    # start the app
     sys.exit(App.exec())
