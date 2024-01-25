@@ -1,24 +1,56 @@
 import sys
-import subprocess
+import os
 import json
+import zipfile
+import subprocess
 import vosk
 import docx
-from PyQt6.QtGui import QAction, QFont
-from PyQt6.QtWidgets import (QApplication, QFileDialog, QMainWindow, QPushButton,
-                             QTextEdit, QVBoxLayout, QWidget, QProgressBar)
 import g4f
 import textwrap
 
-g4f.debug.logging = True # enable logging
-g4f.debug.version_check = False # Disable automatic version checking
+from PyQt6.QtCore import QSettings, QProcess, QDir
+from PyQt6.QtGui import QAction, QFont
+from PyQt6.QtWidgets import (QApplication, QFileDialog, QMainWindow, QPushButton,
+                             QTextEdit, QVBoxLayout, QWidget, QProgressBar, QMessageBox)
+
+from downloading_app import big_model, small_model
+
+
+g4f.debug.logging = True  # enable logging
+g4f.debug.version_check = False  # Disable automatic version checking
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-
         self.init_ui()
         self.result = ''
+        # Set default model folder
+        # self.select_model_folder()
+        self.model_dir = ''
+
+    @staticmethod
+    def check_model_dir(model):
+        # Проверяем директорию модели в папке приложения
+        app_dir = os.path.dirname(os.path.abspath(__file__))
+
+        model_dir = os.path.join(app_dir, model.dir_name) #'vosk-model-ru-0. 42')
+        print(model_dir)
+        if os.path.exists(model_dir):
+            return True
+        return False
+
+    def select_model_folder(self):
+        folder_name = QFileDialog.getExistingDirectory(self, 'Select Model Folder', '')
+        if folder_name:
+            self.model_dir = folder_name
+            self.save_model_dir(self.model_dir)
+
+    def save_model_dir(self, model_dir):
+        # Сохраняем путь в настройках приложения
+        settings = QSettings('JJoy', 'AppSettings')
+        settings.setValue('model_dir', model_dir)
+        self.model_dir = model_dir
 
     def init_ui(self):
         # Create UI elements
@@ -32,8 +64,6 @@ class MainWindow(QMainWindow):
 
         self.progress_bar = QProgressBar(self)
         self.progress_bar.setFont(QFont('Arial', 7))
-        # self.progress_bar.setStyleSheet(
-        #     "QProgressBar {font-size: 5px, height: 5px; border: 1px solid #333; border-radius: 5px; text-align: center;}")
 
         # Set layout
         layout = QVBoxLayout()
@@ -61,6 +91,11 @@ class MainWindow(QMainWindow):
         save_action.triggered.connect(self.save_as_docx)
         file_menu.addAction(save_action)
 
+        # Add 'Select Model Folder' action to the 'File' menu
+        select_model_folder_action = QAction('Select Model Folder', self)
+        select_model_folder_action.triggered.connect(self.select_model_folder)
+        file_menu.addAction(select_model_folder_action)
+
     def ai_text_editing(self):
         text_to_edit = self.text_edit.toPlainText()
         if not text_to_edit:
@@ -72,17 +107,16 @@ class MainWindow(QMainWindow):
         batches = textwrap.wrap(text_to_edit, 2260)
         ai_response = ''
         self.progress_bar.setRange(0, len(batches))
-        self.progress_bar.setRange(0, len(batches))
         for i, batch in enumerate(batches):
-            response = ''
             try:
                 response = g4f.ChatCompletion.create(
                     model= g4f.models.gpt_4,
 
                     messages=[{"role": """text editor""",
-                               "content": f"Ты получишь транскрибацию аудио файла. Нужно переделать её в удобный для чтения вид: "
-                                          f"Поставить знаки препинания, исправить грамматику, прямую, косвенную речь. "
-                                          f"Старайся как можно меньше изменять смысл текста. СВОИ КОММЕНТАРИИИ НЕ ПИШИ!!! ОЦЕНОЧНЫХ СУЖДЕНИЙ НЕ ВЫСКАЗЫВАЙ!"
+                               "content": f"Ты получишь транскрибацию аудио файла. Нужно переделать её в удобный для "
+                                          f"чтения вид: поставить знаки препинания, исправить грамматику, прямую, "
+                                          f"косвенную речь. Старайся как можно меньше изменять смысл текста. "
+                                          f"СВОИ КОММЕНТАРИИИ НЕ ПИШИ!!! ОЦЕНОЧНЫХ СУЖДЕНИЙ НЕ ВЫСКАЗЫВАЙ!"
                                           f"Вот текст для исправления: {batch}"}],
                 )  # alternative model setting
                 self.progress_bar.setValue(i + 1)
@@ -96,23 +130,41 @@ class MainWindow(QMainWindow):
         self.text_edit.setPlainText(ai_response)
 
     def transcribe_audio(self):
-        file_name, _ = QFileDialog.getOpenFileName(self, 'Open Audio File', '', 'Audio Files (*.mp3 *.wav)')
+        # current_path = os.path.dirname(os.path.abspath(__file__))
+
+        default_directory = QDir.rootPath()
+
+        # Использование метода getOpenFileNameAndFilter() для создания диалогового окна
+        file_name, _ = QFileDialog.getOpenFileName(
+            parent=None,
+            caption='Open Audio File',
+            directory=default_directory,
+            filter='Audio Files (*.mp3 *.wav)'
+        )
+        # file_name, _ = QFileDialog.getOpenFileName(self, 'Open Audio File', '', 'Audio Files (*.mp3 *.wav)')
+                                                   # directory=str(os.path.dirname(os.path.abspath(__file__))))
         if file_name:
-            self.model = vosk.Model('vosk-model-ru-0.42')
+            self.model = vosk.Model(self.model_dir)  # 'vosk-model-ru-0.42'
             rec = vosk.KaldiRecognizer(self.model, 16000)
+
+            number_of_iterations = os.path.getsize(file_name)//4000
+            self.progress_bar.setRange(0, number_of_iterations)
+            i = 0
             with subprocess.Popen(["ffmpeg", "-loglevel", "quiet", "-i",
                                    file_name,
                                    "-ar", str(16000), "-ac", "1", "-f", "s16le", "-"],
                                   stdout=subprocess.PIPE) as process:
                 while True:
                     data = process.stdout.read(4000)
+                    i += 1
                     if len(data) == 0:
                         break
+                    # self.progress_bar.setRange(0, rec.NumFrames())
+                    self.progress_bar.setValue(i)
                     rec.AcceptWaveform(data)
 
-                self.result: str = json.loads(rec.FinalResult())['text']   # запятые в числах мешают преобразовать в json
-                # result = result.split('"text"')[1]
-                print(self.result, type(self.result))
+                self.result: str = json.loads(rec.FinalResult())['text']  # запятые в числах мешают преобразовать в json
+                print(self.result)
                 # Display the recognized text
                 self.text_edit.setPlainText(self.result.strip())
 
@@ -130,9 +182,48 @@ class MainWindow(QMainWindow):
 
 
 if __name__ == '__main__':
+    model = big_model
     app = QApplication(sys.argv)
 
     window = MainWindow()
-    window.show()
 
+    model_found = window.check_model_dir(model)
+
+    if model_found:
+        window.save_model_dir(model.dir_name)
+    else:
+        # Если нет - предлагаем скачать
+        resp = QMessageBox.question(
+            window, 'Model not found',
+            'Модель для транскрибации не найдена. Скачать?',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+
+        if resp == QMessageBox.StandardButton.Yes:
+            model_zip = model.zip_name
+
+            process = QProcess()
+
+            # Путь к второму приложению
+            program_path = "downloading_app.py"
+            # Запускаем второе приложение
+            file_path = os.path.join(os.path.dirname(__file__), program_path)
+            print(file_path)
+            # Запускаем второе приложение с передачей параметра
+            subprocess.run(["python3", file_path, model.model_name])
+
+            app_dir = os.path.dirname(os.path.abspath(__file__))
+            with zipfile.ZipFile(model_zip, 'r') as zip_ref:
+                zip_ref.extractall(app_dir)
+            os.remove(model_zip)
+            window.save_model_dir(model.dir_name)
+        else:
+            # Если отказались - запрашиваем директорию
+            model_dir = QFileDialog.getExistingDirectory(window, 'Select Model Directory')
+            print(model_dir)
+            if model_dir:
+                # Сохраняем выбранную директорию
+                window.save_model_dir(model_dir)
+            print(window.model_dir)
+
+    window.show()
     sys.exit(app.exec())
