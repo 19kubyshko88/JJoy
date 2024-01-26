@@ -7,14 +7,14 @@ import vosk
 import docx
 import g4f
 import textwrap
-
-from PyQt6.QtCore import QSettings, QProcess, QDir
-from PyQt6.QtGui import QAction, QFont
+import threading
+from PyQt6 import QtGui
+from PyQt6.QtCore import QSettings, QDir, QRect
+from PyQt6.QtGui import QAction, QFont, QIcon
 from PyQt6.QtWidgets import (QApplication, QFileDialog, QMainWindow, QPushButton,
                              QTextEdit, QVBoxLayout, QWidget, QProgressBar, QMessageBox)
-
+from downloading_app import DownloadingModelWidget
 import settings
-
 
 g4f.debug.logging = True  # enable logging
 g4f.debug.version_check = False  # Disable automatic version checking
@@ -35,12 +35,21 @@ class MainWindow(QMainWindow):
     def check_model_dir(model):
         # Проверяем директорию модели в папке приложения
         app_dir = os.path.dirname(os.path.abspath(__file__))
-
-        model_dir = os.path.join(app_dir, model.dir_name) #'vosk-model-ru-0. 42')
+        model_dir = os.path.join(app_dir, model.dir_name)  # 'vosk-model-ru-0. 42')
         print(model_dir)
         if os.path.exists(model_dir):
             return True
         return False
+
+    def create_recognizer(self):
+        self.button_transcribe.setText('Загружается модель...')
+        self.button_transcribe.setEnabled(False)
+        self.menuBar().setEnabled(False)
+        self.model = vosk.Model(self.model_dir)  # 'vosk-model-ru-0.42'
+        self.rec = vosk.KaldiRecognizer(self.model, 16000)
+        self.button_transcribe.setEnabled(True)
+        self.button_transcribe.setText('Transcribe Audio')
+        self.menuBar().setEnabled(True)
 
     def select_model_folder(self):
         folder_name = QFileDialog.getExistingDirectory(self, 'Select Model Folder', '')
@@ -48,16 +57,18 @@ class MainWindow(QMainWindow):
             self.model_dir = folder_name
             self.save_model_dir(self.model_dir)
 
-    def save_model_dir(self, model_dir):
+    def save_model_dir(self, model_folder):
         # Сохраняем путь в настройках приложения
         settings = QSettings('JJoy', 'AppSettings')
-        settings.setValue('model_dir', model_dir)
-        self.model_dir = model_dir
+        settings.setValue('model_dir', model_folder)
+        self.model_dir = model_folder
+        thread = threading.Thread(target=self.create_recognizer)
+        thread.start()
 
     def init_ui(self):
         # Create UI elements
-        self.button = QPushButton('Transcribe Audio', self)
-        self.button.clicked.connect(self.transcribe_audio)
+        self.button_transcribe = QPushButton('Transcribe Audio', self)
+        self.button_transcribe.clicked.connect(self.transcribe_audio)
 
         self.button_ai = QPushButton('AI', self)
         self.button_ai.clicked.connect(self.ai_text_editing)
@@ -69,7 +80,7 @@ class MainWindow(QMainWindow):
 
         # Set layout
         layout = QVBoxLayout()
-        layout.addWidget(self.button)
+        layout.addWidget(self.button_transcribe)
         layout.addWidget(self.button_ai)
         layout.addWidget(self.text_edit)
         layout.addWidget(self.progress_bar)
@@ -80,7 +91,13 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
 
         # Set window title
-        self.setWindowTitle('Audio to Text Converter')
+        # icon = QIcon('icons/icon_048.ico')
+        icon = QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap("icons/icon.png"), state=QtGui.QIcon.State.On)
+        self.setWindowIcon(icon)
+        self.setWindowTitle('JJoy - Audio to Text Converter')
+        self.download_widget = DownloadingModelWidget()
+        self.download_widget.hide()
 
         # Create menu bar
         menu_bar = self.menuBar()
@@ -112,7 +129,7 @@ class MainWindow(QMainWindow):
         for i, batch in enumerate(batches):
             try:
                 response = g4f.ChatCompletion.create(
-                    model= g4f.models.gpt_4,
+                    model=g4f.models.gpt_4,
 
                     messages=[{"role": """text editor""",
                                "content": f"Ты получишь транскрибацию аудио файла. Нужно переделать её в удобный для "
@@ -123,7 +140,6 @@ class MainWindow(QMainWindow):
                 )  # alternative model setting
                 self.progress_bar.setValue(i + 1)
             except Exception:
-
                 self.text_edit.setPlainText("Возможно проблемы с интернетом")
                 return
 
@@ -132,7 +148,6 @@ class MainWindow(QMainWindow):
         self.text_edit.setPlainText(ai_response)
 
     def transcribe_audio(self):
-        # current_path = os.path.dirname(os.path.abspath(__file__))
 
         default_directory = QDir.rootPath()
 
@@ -143,13 +158,10 @@ class MainWindow(QMainWindow):
             directory=default_directory,
             filter='Audio Files (*.mp3 *.wav)'
         )
-        # file_name, _ = QFileDialog.getOpenFileName(self, 'Open Audio File', '', 'Audio Files (*.mp3 *.wav)')
-                                                   # directory=str(os.path.dirname(os.path.abspath(__file__))))
-        if file_name:
-            self.model = vosk.Model(self.model_dir)  # 'vosk-model-ru-0.42'
-            rec = vosk.KaldiRecognizer(self.model, 16000)
 
-            number_of_iterations = os.path.getsize(file_name)//4000
+        if file_name:
+            self.button_transcribe.setEnabled(False)
+            number_of_iterations = os.path.getsize(file_name) // 4000
             self.progress_bar.setRange(0, number_of_iterations)
             i = 0
             with subprocess.Popen(["ffmpeg", "-loglevel", "quiet", "-i",
@@ -163,15 +175,17 @@ class MainWindow(QMainWindow):
                         break
                     # self.progress_bar.setRange(0, rec.NumFrames())
                     self.progress_bar.setValue(i)
-                    rec.AcceptWaveform(data)
+                    self.rec.AcceptWaveform(data)
 
-                self.result: str = json.loads(rec.FinalResult())['text']  # запятые в числах мешают преобразовать в json
+                self.result: str = json.loads(self.rec.FinalResult())[
+                    'text']  # запятые в числах мешают преобразовать в json
                 print(self.result)
                 # Display the recognized text
                 self.text_edit.setPlainText(self.result.strip())
 
                 # Save the result as a docx file
                 self.save_as_docx()
+                self.button_transcribe.setEnabled(True)
 
     def save_as_docx(self):
         file_name, _ = QFileDialog.getSaveFileName(self, 'Save as Word Document', '', 'Word Document (*.docx)')
@@ -186,9 +200,17 @@ class MainWindow(QMainWindow):
 if __name__ == '__main__':
     model = settings.model
     app = QApplication(sys.argv)
-
+    screen_width = QApplication.screens()[0].size().width()
+    screen_height = QApplication.screens()[0].size().height()
     window = MainWindow()
-
+    win_width = 350
+    win_height = 300
+    window.setGeometry(QRect((screen_width - win_width) // 2,
+                             (screen_height - win_height) // 2,
+                             win_width,
+                             win_height)
+                       )
+    window.show()  # будем хоть какоето окно видеть, пока запускается
     model_found = window.check_model_dir(model)
 
     if model_found:
@@ -203,15 +225,8 @@ if __name__ == '__main__':
         if resp == QMessageBox.StandardButton.Yes:
             model_zip = model.zip_name
 
-            process = QProcess()
-
-            # Путь к второму приложению
-            program_path = "downloading_app.py"
-            # Запускаем второе приложение
-            file_path = os.path.join(os.path.dirname(__file__), program_path)
-            print(file_path)
-            # Запускаем второе приложение с передачей параметра
-            subprocess.run(["python3", file_path, model.model_name])
+            window.download_widget.show()
+            window.download_widget.download(model)
 
             app_dir = os.path.dirname(os.path.abspath(__file__))
             with zipfile.ZipFile(model_zip, 'r') as zip_ref:
@@ -227,5 +242,4 @@ if __name__ == '__main__':
                 window.save_model_dir(model_dir)
             print(window.model_dir)
 
-    window.show()
     sys.exit(app.exec())

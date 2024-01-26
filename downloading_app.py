@@ -49,10 +49,9 @@ big_model = Model('big_model', 'https://alphacephei.com/vosk/models/vosk-model-r
 small_model = Model('small_model', 'https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip')
 
 
-class DownloadingModelApp(QWidget):
-    def __init__(self, model_type):
+class DownloadingModelWidget(QWidget):
+    def __init__(self):
         super().__init__()
-        self.model = big_model if big_model.model_name == model_type else small_model
         # calling a defined method to initialize UI
         self.init_UI()
 
@@ -98,16 +97,16 @@ class DownloadingModelApp(QWidget):
             QApplication.processEvents()
 
     # method to download any file using urllib
-    def download(self):
-        parsed_url = self.model.parsed_url
+    def download(self, model: Model):
+        parsed_url = model.parsed_url
         file_name = os.path.basename(parsed_url.path)
         # specify save location where the file is to be saved
         save_loc = os.path.dirname(os.path.abspath(__file__))
         full_path = os.path.join(save_loc, file_name)
-        print(self.model.url)
+        print(model.url)
         # Downloading using urllib
         try:
-            urllib.request.urlretrieve(self.model.url, full_path, self.handle_progress)
+            urllib.request.urlretrieve(model.url, full_path, self.handle_progress)
         except urllib.error.URLError:
             self.label.show()
             print("Возможно проблемы с интернетом")
@@ -122,11 +121,11 @@ if __name__ == '__main__':
     print('downloading')
     args = sys.argv
     # Получаем параметр
-    param = args[1]   # small_model
+    param = small_model
     # Создаем приложение
-    App = QApplication(sys.argv[1:])
+    App = QApplication(sys.argv)
     # Создаем окно приложения с переданным параметром
-    window = DownloadingModelApp(param)
-    window.download()
+    window = DownloadingModelWidget()
+    window.download(param)
 
     sys.exit(App.exec())
