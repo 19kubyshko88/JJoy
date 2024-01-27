@@ -45,6 +45,7 @@ class MainWindow(QMainWindow):
         self.button_transcribe.setText('Загружается модель...')
         self.button_transcribe.setEnabled(False)
         self.menuBar().setEnabled(False)
+        print(self.model_dir)
         self.model = vosk.Model(self.model_dir)  # 'vosk-model-ru-0.42'
         self.rec = vosk.KaldiRecognizer(self.model, 16000)
         self.button_transcribe.setEnabled(True)
@@ -62,8 +63,9 @@ class MainWindow(QMainWindow):
         settings = QSettings('JJoy', 'AppSettings')
         settings.setValue('model_dir', model_folder)
         self.model_dir = model_folder
-        thread = threading.Thread(target=self.create_recognizer)
-        thread.start()
+        # thread = threading.Thread(target=self.create_recognizer)
+        # thread.start()
+        self.create_recognizer()
 
     def init_ui(self):
         # Create UI elements
@@ -159,33 +161,35 @@ class MainWindow(QMainWindow):
             filter='Audio Files (*.mp3 *.wav)'
         )
 
-        if file_name:
-            self.button_transcribe.setEnabled(False)
-            number_of_iterations = os.path.getsize(file_name) // 4000
-            self.progress_bar.setRange(0, number_of_iterations)
-            i = 0
-            with subprocess.Popen(["ffmpeg", "-loglevel", "quiet", "-i",
-                                   file_name,
-                                   "-ar", str(16000), "-ac", "1", "-f", "s16le", "-"],
-                                  stdout=subprocess.PIPE) as process:
-                while True:
-                    data = process.stdout.read(4000)
-                    i += 1
-                    if len(data) == 0:
-                        break
-                    # self.progress_bar.setRange(0, rec.NumFrames())
-                    self.progress_bar.setValue(i)
-                    self.rec.AcceptWaveform(data)
+        if not file_name:
+            return
 
-                self.result: str = json.loads(self.rec.FinalResult())[
-                    'text']  # запятые в числах мешают преобразовать в json
-                print(self.result)
-                # Display the recognized text
-                self.text_edit.setPlainText(self.result.strip())
+        self.button_transcribe.setEnabled(False)
+        number_of_iterations = os.path.getsize(file_name) // 4000
+        self.progress_bar.setRange(0, number_of_iterations)
+        i = 0
+        with subprocess.Popen(["ffmpeg", "-loglevel", "quiet", "-i",
+                               file_name,
+                               "-ar", str(16000), "-ac", "1", "-f", "s16le", "-"],
+                              stdout=subprocess.PIPE) as process:
+            while True:
+                data = process.stdout.read(4000)
+                i += 1
+                if len(data) == 0:
+                    break
+                # self.progress_bar.setRange(0, rec.NumFrames())
+                self.progress_bar.setValue(i)
+                self.rec.AcceptWaveform(data)
 
-                # Save the result as a docx file
-                self.save_as_docx()
-                self.button_transcribe.setEnabled(True)
+            self.result: str = json.loads(self.rec.FinalResult())[
+                'text']  # запятые в числах мешают преобразовать в json
+            print(self.result)
+            # Display the recognized text
+            self.text_edit.setPlainText(self.result.strip())
+
+            # Save the result as a docx file
+            self.save_as_docx()
+            self.button_transcribe.setEnabled(True)
 
     def save_as_docx(self):
         file_name, _ = QFileDialog.getSaveFileName(self, 'Save as Word Document', '', 'Word Document (*.docx)')
@@ -231,7 +235,7 @@ if __name__ == '__main__':
             app_dir = os.path.dirname(os.path.abspath(__file__))
             with zipfile.ZipFile(model_zip, 'r') as zip_ref:
                 zip_ref.extractall(app_dir)
-            os.remove(model_zip)
+            # os.remove(model_zip)
             window.save_model_dir(model.dir_name)
         else:
             # Если отказались - запрашиваем директорию
