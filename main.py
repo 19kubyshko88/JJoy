@@ -3,6 +3,8 @@ import os
 import json
 import zipfile
 import subprocess
+import re
+
 import vosk
 import docx
 import g4f
@@ -117,6 +119,13 @@ class MainWindow(QMainWindow):
         select_model_folder_action.triggered.connect(self.select_model_folder)
         file_menu.addAction(select_model_folder_action)
 
+    @staticmethod
+    def remove_tags(text, tag_names):
+        for tag_name in tag_names:
+            pattern = re.compile(r'<' + tag_name + r'>.*?</' + tag_name + r'>', re.DOTALL)
+            text = re.sub(pattern, '', text)
+        return text
+
     def ai_text_editing(self):
         text_to_edit = self.text_edit.toPlainText()
         if not text_to_edit:
@@ -147,7 +156,8 @@ class MainWindow(QMainWindow):
 
             if response:
                 ai_response += f'\n\n{response}'
-        self.text_edit.setPlainText(ai_response)
+        response = self.remove_tags(ai_response, ["PHIND_SPAN_BEGIN", "PHIND_SPAN_END"]).strip()
+        self.text_edit.setPlainText(response)
 
     def transcribe_audio(self):
 
