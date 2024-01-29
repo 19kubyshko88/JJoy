@@ -1,52 +1,12 @@
-import urllib.request
 import sys
 import ssl
 import os
-import re
-from urllib.parse import urlparse
+import urllib.request
 from PyQt6.QtWidgets import QWidget, QApplication, QLabel, QProgressBar, QPushButton
-from dataclasses import dataclass
+
+from utils.model_template import Model
 
 ssl._create_default_https_context = ssl._create_unverified_context
-
-
-@dataclass
-class Model:
-    __model_name: str
-    __url: str
-
-    def __post_init__(self):
-        if not self._is_valid_url(self.url):
-            raise ValueError("Invalid URL")
-
-    @property
-    def parsed_url(self):
-        return urlparse(self.__url)
-
-    @property
-    def url(self):
-        return self.__url
-
-    @property
-    def model_name(self):
-        return self.__model_name
-
-    @property
-    def zip_name(self):
-        return os.path.basename(self.parsed_url.path)
-
-    @property
-    def dir_name(self):
-        return self.zip_name.rstrip('.zip')
-
-    @staticmethod
-    def _is_valid_url(url):
-        pattern = r"^https://(.+)\.zip$"
-        return re.match(pattern, url) is not None
-
-
-big_model = Model('big_model', 'https://alphacephei.com/vosk/models/vosk-model-ru-0.42.zip')
-small_model = Model('small_model', 'https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip')
 
 
 class DownloadingModelWidget(QWidget):
@@ -117,6 +77,8 @@ class DownloadingModelWidget(QWidget):
 
 
 if __name__ == '__main__':
+    from settings import small_model, big_model
+
     # Получаем список аргументов командной строки
     print('downloading')
     args = sys.argv

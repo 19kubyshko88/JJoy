@@ -1,3 +1,6 @@
-from downloading_app import big_model, small_model
+from utils.model_template import Model
 
-model = small_model
+big_model = Model('big_model', 'https://alphacephei.com/vosk/models/vosk-model-ru-0.42.zip')
+small_model = Model('small_model', 'https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip')
+
+model = big_model
