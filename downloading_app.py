@@ -2,7 +2,7 @@ import sys
 import ssl
 import os
 import urllib.request
-from PyQt6.QtWidgets import QWidget, QApplication, QLabel, QProgressBar, QPushButton
+from PyQt6.QtWidgets import QWidget, QLabel, QProgressBar, QPushButton
 
 from utils.model_template import Model
 
@@ -77,13 +77,14 @@ class DownloadingModelWidget(QWidget):
 
 
 if __name__ == '__main__':
-    from settings import small_model, big_model
+    from settings import model
+    from PyQt6.QtWidgets import QApplication
 
     # Получаем список аргументов командной строки
     print('downloading')
     args = sys.argv
     # Получаем параметр
-    param = small_model
+    param = model
     # Создаем приложение
     App = QApplication(sys.argv)
     # Создаем окно приложения с переданным параметром

@@ -9,7 +9,6 @@ import vosk
 import docx
 import g4f
 import textwrap
-import threading
 from PyQt6 import QtGui
 from PyQt6.QtCore import QSettings, QDir, QRect
 from PyQt6.QtGui import QAction, QFont, QIcon
@@ -178,7 +177,7 @@ class MainWindow(QMainWindow):
         number_of_iterations = os.path.getsize(file_name) // 4000
         self.progress_bar.setRange(0, number_of_iterations)
         i = 0
-        with subprocess.Popen(["ffmpeg", "-loglevel", "quiet", "-i",
+        with subprocess.Popen(["ffmpeg", "-loglevel", "quiet", "-i",  # r"C:\ffmpeg\bin\ffmpeg.exe"
                                file_name,
                                "-ar", str(16000), "-ac", "1", "-f", "s16le", "-"],
                               stdout=subprocess.PIPE) as process:
@@ -191,8 +190,7 @@ class MainWindow(QMainWindow):
                 self.progress_bar.setValue(i)
                 self.rec.AcceptWaveform(data)
 
-            self.result: str = json.loads(self.rec.FinalResult())[
-                'text']  # запятые в числах мешают преобразовать в json
+            self.result: str = json.loads(self.rec.FinalResult())['text']  # запятые в числах мешают преобразовать в json
             print(self.result)
             # Display the recognized text
             self.text_edit.setPlainText(self.result.strip())
@@ -245,7 +243,7 @@ if __name__ == '__main__':
             app_dir = os.path.dirname(os.path.abspath(__file__))
             with zipfile.ZipFile(model_zip, 'r') as zip_ref:
                 zip_ref.extractall(app_dir)
-            # os.remove(model_zip)
+            os.remove(model_zip)
             window.save_model_dir(model.dir_name)
         else:
             # Если отказались - запрашиваем директорию
