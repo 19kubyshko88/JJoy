@@ -36,6 +36,12 @@ class TranscribeThread(QThread):
 class MainWindow(QMainWindow):
     app_dir = os.path.dirname(os.path.abspath(__file__))
 
+    # def __new__(cls):
+    #     dir_path = os.path.join(cls.app_dir, 'models')
+    #     if not os.path.exists(dir_path):
+    #         os.makedirs(dir_path)
+    #     return super().__new__(cls)
+
     def __init__(self):
         super().__init__()
         self.init_ui()
@@ -91,9 +97,9 @@ class MainWindow(QMainWindow):
 
     def save_as_docx(self):
         file_name, _ = QFileDialog.getSaveFileName(self, 'Сохранить в Word', '', 'Word Document (*.docx)')
-        if not file_name.endswith('.docx'):
-            file_name = f'{file_name}.docx'
         if file_name:
+            if not file_name.endswith('.docx'):
+                file_name = f'{file_name}.docx'
             doc = docx.Document()
             doc.add_paragraph(self.text_edit.toPlainText())
             doc.save(file_name)
@@ -206,7 +212,10 @@ class MainWindow(QMainWindow):
     def create_transcriber(self):
         self.args.model = self.model_dir
         logging.getLogger().setLevel("INFO")
-        self.transcriber = QTranscriber(self.args)
+        try:
+            self.transcriber = QTranscriber(self.args)
+        except:
+            print("нет модели")
 
     def transcribe_audio(self):
         self.button_transcribe.setText('Идет транскрибация...')
