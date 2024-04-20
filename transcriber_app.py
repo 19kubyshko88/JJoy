@@ -11,8 +11,8 @@ from PyQt6.QtWidgets import (QApplication, QFileDialog, QMainWindow, QPushButton
 from utils.q_transcriber import QTranscriber
 # from downloading_app import DownloadingModelWidget
 from utils import functions
+import settings
 
-ffmpeg_zip_url_win = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
 # THEB_AI_API_KEY = os.getenv("THEB_AI_API_KEY")
 
 
@@ -178,12 +178,12 @@ class MainWindow(QMainWindow):
 
 
     def show_reqs(self):
-        text = """Чтобы заработало нужно:<br>
-                 1.Скачать <a href='https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip'>ffmpeg</a> и распаковать в C:\\ffmpeg <br>
-                 2. Скачать модели <a href='https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip'>быструю</a> и 
-                  <a href='https://alphacephei.com/vosk/models/vosk-model-ru-0.42.zip'>точную</a>
-                  и распаковать в директорию с программой.<br> 
-                  3. Перейти в настройки и выбрать папку с моделью.
+        text = f"""Чтобы заработало нужно:<br>
+                 1.Скачать <a href={settings.ffmpeg_zip_url_win}>ffmpeg</a> и распаковать в C:\\ffmpeg <br>
+                 2. В настройках выбрать папки с аудио и куда сохранять. В папке с аудио должно быть только аудио. 
+                 3. Для более точного распознавания нужно скачать <a href={settings.big_model.url}>большую модель</a>
+                  и распаковать в директорию с программой. Перейти в настройки и выбрать папку с моделью.<br> 
+
                   """
         functions.show_interactive_text(self, text)
 
